@@ -8,6 +8,7 @@ import fetch from "node-fetch";
   const originalBody = process.env.COMMENT_BODY;
   const owner = process.env.REPO_OWNER;
   const repo = process.env.REPO_NAME;
+  const discussionNumber = parseInt(process.env.DISCUSSION_NUMBER);
 
   const graphqlWithAuth = graphql.defaults({
     headers: {
@@ -15,22 +16,25 @@ import fetch from "node-fetch";
     },
   });
 
+  // Buscar todos os comentários da discussão
   const query = `
-    query($owner: String!, $repo: String!) {
+    query($owner: String!, $repo: String!, $discussionNumber: Int!) {
       repository(owner: $owner, name: $repo) {
-        discussionComments(first: 100) {
-          nodes {
-            id
-            databaseId
-            body
+        discussion(number: $discussionNumber) {
+          comments(first: 100) {
+            nodes {
+              id
+              databaseId
+              body
+            }
           }
         }
       }
     }
   `;
 
-  const res = await graphqlWithAuth(query, { owner, repo });
-  const comments = res.repository.discussionComments.nodes;
+  const res = await graphqlWithAuth(query, { owner, repo, discussionNumber });
+  const comments = res.repository.discussion.comments.nodes;
   const commentNode = comments.find(c => c.databaseId === commentIdNumeric);
 
   if (!commentNode) {
@@ -41,6 +45,7 @@ import fetch from "node-fetch";
   const commentNodeId = commentNode.id;
   let previews = '';
 
+  // Extrair URLs
   const urls = [...originalBody.matchAll(/https?:\/\/[^\s)]+/g)].map(m => m[0]);
 
   for (const url of urls) {
@@ -50,6 +55,7 @@ import fetch from "node-fetch";
       const dom = new JSDOM(text);
       const metaOgTitle = dom.window.document.querySelector('meta[property="og:title"]');
       const title = (metaOgTitle && metaOgTitle.getAttribute('content')) || dom.window.document.title || url;
+
       previews += `> **${title}**\n> ${url}\n\n`;
     } catch (err) {
       console.error(`Erro ao buscar ${url}:`, err);
