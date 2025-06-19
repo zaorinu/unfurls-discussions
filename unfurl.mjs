@@ -1,6 +1,6 @@
-const { graphql } = require('@octokit/graphql');
-const { JSDOM } = require('jsdom');
-const fetch = require('node-fetch');
+import { graphql } from "@octokit/graphql";
+import { JSDOM } from "jsdom";
+import fetch from "node-fetch";
 
 (async () => {
   const token = process.env.GH_TOKEN;
