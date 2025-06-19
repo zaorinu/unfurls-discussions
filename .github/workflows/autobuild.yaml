@@ -3,7 +3,7 @@ name: CI | Auto Build
 on:
   push:
     paths:
-      - 'unfurl.mjs'
+      - 'unfurl.js'
 
 permissions:
   contents: write
