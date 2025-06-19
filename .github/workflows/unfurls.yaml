@@ -1,0 +1,29 @@
+name: Edit Discussion Comment with Link Previews
+
+on:
+  discussion_comment:
+    types: [created, edited]
+
+permissions:
+  discussions: write
+
+jobs:
+  unfurl:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install @octokit/graphql jsdom node-fetch@2
+
+      - name: Run unfurl script
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMENT_ID_NUMERIC: ${{ github.event.comment.id }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: node .github/scripts/unfurl.js
