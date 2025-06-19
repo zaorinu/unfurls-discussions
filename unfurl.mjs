@@ -11,12 +11,10 @@ import fetch from "node-fetch";
   const discussionNumber = parseInt(process.env.DISCUSSION_NUMBER);
 
   const graphqlWithAuth = graphql.defaults({
-    headers: {
-      authorization: `token ${token}`,
-    },
+    headers: { authorization: `token ${token}` },
   });
 
-  // Buscar todos os comentários da discussão
+  // Busca os comentários da discussion
   const query = `
     query($owner: String!, $repo: String!, $discussionNumber: Int!) {
       repository(owner: $owner, name: $repo) {
@@ -45,8 +43,9 @@ import fetch from "node-fetch";
   const commentNodeId = commentNode.id;
   let previews = '';
 
-  // Extrair URLs
-  const urls = [...originalBody.matchAll(/https?:\/\/[^\s)]+/g)].map(m => m[0]);
+  // Extrair URLs (somente do corpo fora do bloco de rodapé)
+  const bodyWithoutFooter = originalBody.replace(/<!-- unfurl-bot-start -->[\s\S]*?<!-- unfurl-bot-end -->/g, '').trim();
+  const urls = [...bodyWithoutFooter.matchAll(/https?:\/\/[^\s)]+/g)].map(m => m[0]);
 
   for (const url of urls) {
     try {
@@ -62,8 +61,11 @@ import fetch from "node-fetch";
     }
   }
 
-  const cleanBody = originalBody.replace(/^>.*(\n|$)/gm, '').trim();
-  const newBody = `${cleanBody}\n\n${previews}`;
+  let newBody = bodyWithoutFooter;
+
+  if (previews.trim() !== '') {
+    newBody += `\n\n<!-- unfurl-bot-start -->\n${previews}<!-- unfurl-bot-end -->`;
+  }
 
   const mutation = `
     mutation($commentId: ID!, $body: String!) {
