@@ -28,4 +28,4 @@ jobs:
           COMMENT_BODY: ${{ github.event.comment.body }}
           REPO_OWNER: ${{ github.repository_owner }}
           REPO_NAME: ${{ github.event.repository.name }}
-        run: node unfurl.js
+        run: node unfurl.mjs
