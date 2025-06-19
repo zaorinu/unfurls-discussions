@@ -1,8 +1,8 @@
 name: 'Unfurl Discussion Comment'
 description: 'Add link previews on GitHub Discussions'
 author: 'Luis Antonio'
-icon: link
-color: yellow
+icon: 'link'
+color: 'yellow'
 
 runs:
   using: 'node16'
