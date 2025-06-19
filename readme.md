@@ -27,14 +27,23 @@ This GitHub Action fetches and adds link previews below the original comment in 
 ### Usage Example
 
 ```yaml
+name: Unfurl Comments
+
+on:
+  discussion_comment:
+    types: [created, edited]
+
+permissions:
+  discussions: write
+
 jobs:
-  unfurl_comment:
+  unfurl:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
-      - name: Unfurl GitHub Discussion Comment
-        uses: zaorinu/unfurl-discussion-comment@v1
+      - name: Run unfurl action
+        uses: zaorinu/unfurls-discussions@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           comment_id_numeric: ${{ github.event.comment.id }}
@@ -42,3 +51,4 @@ jobs:
           repo_owner: ${{ github.repository_owner }}
           repo_name: ${{ github.event.repository.name }}
           discussion_number: ${{ github.event.discussion.number }}
+
