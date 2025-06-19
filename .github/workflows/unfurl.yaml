@@ -17,7 +17,7 @@ jobs:
           node-version: 18
 
       - name: Install dependencies
-        run: npm install @octokit/graphql jsdom
+        run: npm install @octokit/graphql jsdom node-fetch@2
 
       - name: Run script to update comment
         env:
@@ -27,26 +27,26 @@ jobs:
           REPO_OWNER: ${{ github.repository_owner }}
           REPO_NAME: ${{ github.event.repository.name }}
         run: |
-          node <<'EOF'
-          import { graphql } from "@octokit/graphql";
-          import { JSDOM } from "jsdom";
+          node -e "
+          const { graphql } = require('@octokit/graphql');
+          const { JSDOM } = require('jsdom');
+          const fetch = require('node-fetch');
 
-          const token = process.env.GH_TOKEN;
-          const commentIdNumeric = process.env.COMMENT_ID_NUMERIC;
-          const originalBody = process.env.COMMENT_BODY;
-          const owner = process.env.REPO_OWNER;
-          const repo = process.env.REPO_NAME;
+          (async () => {
+            const token = process.env.GH_TOKEN;
+            const commentIdNumeric = parseInt(process.env.COMMENT_ID_NUMERIC);
+            const originalBody = process.env.COMMENT_BODY;
+            const owner = process.env.REPO_OWNER;
+            const repo = process.env.REPO_NAME;
 
-          const graphqlWithAuth = graphql.defaults({
-            headers: {
-              authorization: `token ${token}`,
-            },
-          });
+            const graphqlWithAuth = graphql.defaults({
+              headers: {
+                authorization: \`token \${token}\`,
+              },
+            });
 
-          async function run() {
-            // 1. Buscar o Node ID do comentário pelo ID numérico
-            const query = `
-              query($owner: String!, $repo: String!, $commentId: Int!) {
+            const query = \`
+              query($owner: String!, $repo: String!) {
                 repository(owner: $owner, name: $repo) {
                   discussionComments(first: 100) {
                     nodes {
@@ -57,49 +57,40 @@ jobs:
                   }
                 }
               }
-            `;
+            \";
 
-            // Como não existe query direta para comment pelo numeric id,
-            // buscamos os 100 comentários e filtramos localmente.
-            const res = await graphqlWithAuth(query, { owner, repo, commentId: parseInt(commentIdNumeric) });
+            const res = await graphqlWithAuth(query, { owner, repo });
 
             const comments = res.repository.discussionComments.nodes;
-            const commentNode = comments.find(c => c.databaseId === parseInt(commentIdNumeric));
+            const commentNode = comments.find(c => c.databaseId === commentIdNumeric);
 
             if (!commentNode) {
-              console.error("Comentário não encontrado com ID numérico:", commentIdNumeric);
+              console.error('Comentário não encontrado com ID numérico:', commentIdNumeric);
               process.exit(1);
             }
 
             const commentNodeId = commentNode.id;
-            let previews = "";
+            let previews = '';
 
-            // 2. Extrair links do comentário original
-            const urls = [...originalBody.matchAll(/https?:\/\/[^\s)]+/g)].map(m => m[0]);
+            const urls = [...originalBody.matchAll(/https?:\\/\\/[^\\s)]+/g)].map(m => m[0]);
 
             for (const url of urls) {
               try {
                 const resp = await fetch(url);
                 const text = await resp.text();
                 const dom = new JSDOM(text);
-                let title = dom.window.document.querySelector('meta[property="og:title"]')?.getAttribute('content')
-                  || dom.window.document.title
-                  || url;
-
-                previews += `> **${title}**\n> ${url}\n\n`;
+                const metaOgTitle = dom.window.document.querySelector('meta[property=\"og:title\"]');
+                const title = (metaOgTitle && metaOgTitle.getAttribute('content')) || dom.window.document.title || url;
+                previews += \`> **\${title}**\\n> \${url}\\n\\n\`;
               } catch {
-                console.error(`Erro ao buscar ${url}`);
+                console.error(\`Erro ao buscar \${url}\`);
               }
             }
 
-            // 3. Remover previews antigos do corpo
-            const cleanBody = originalBody.replace(/^>.*(\n|$)/gm, "").trim();
+            const cleanBody = originalBody.replace(/^>.*(\\n|$)/gm, '').trim();
+            const newBody = \`\${cleanBody}\\n\\n\${previews}\`;
 
-            // 4. Montar novo corpo
-            const newBody = `${cleanBody}\n\n${previews}`;
-
-            // 5. Atualizar o comentário via mutation
-            const mutation = `
+            const mutation = \`
               mutation($commentId: ID!, $body: String!) {
                 updateDiscussionComment(input: {commentId: $commentId, body: $body}) {
                   comment {
@@ -108,15 +99,13 @@ jobs:
                   }
                 }
               }
-            `;
+            \`;
 
             const updateRes = await graphqlWithAuth(mutation, { commentId: commentNodeId, body: newBody });
 
-            console.log("Comentário atualizado com sucesso:", updateRes.updateDiscussionComment.comment.id);
-          }
-
-          run().catch(err => {
+            console.log('Comentário atualizado com sucesso:', updateRes.updateDiscussionComment.comment.id);
+          })().catch(err => {
             console.error(err);
             process.exit(1);
           });
-          EOF
+          "
