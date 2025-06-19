@@ -1,0 +1,53 @@
+name: Edit Discussion Comment with Link Previews
+
+on:
+  discussion_comment:
+    types: [created, edited]
+
+jobs:
+  unfurl:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Edit comment adding previews below original content
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COMMENT_ID="${{ github.event.comment.id }}"
+          COMMENT_BODY="${{ github.event.comment.body }}"
+          REPO="${{ github.repository }}"
+
+          PREVIEWS=""
+
+          # Extrai links do comentário
+          echo "$COMMENT_BODY" | grep -oE 'https?://[^ )\]\"]+' | while read -r url; do
+            echo "Processando link: $url"
+
+            HTML=$(curl -sL --max-time 10 "$url")
+
+            # Tenta pegar título og:title, se não o <title>
+            OG_TITLE=$(echo "$HTML" | grep -oP '(?<=<meta property="og:title" content=")[^"]+' | head -n1)
+            PAGE_TITLE=$(echo "$HTML" | grep -oP '(?<=<title>).*?(?=</title>)' | head -n1)
+            TITLE="${OG_TITLE:-$PAGE_TITLE}"
+
+            if [ ! -z "$TITLE" ]; then
+              # Adiciona preview formatado como bloco de citação (>)
+              PREVIEWS+="> **$TITLE**\n> $url\n\n"
+            else
+              echo "Título não encontrado para $url"
+            fi
+          done
+
+          # Remove previews antigos caso já existam (linhas que começam com > e foram adicionadas antes)
+          # Preserva apenas a parte original sem blocos > no final
+          CLEAN_BODY=$(echo "$COMMENT_BODY" | sed '/^>/d')
+
+          # Monta novo corpo do comentário
+          NEW_BODY="${CLEAN_BODY}\n\n${PREVIEWS}"
+
+          echo "Editando comentário..."
+
+          curl -s -X PATCH \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${REPO}/discussions/comments/${COMMENT_ID}" \
+            -d "$(jq -n --arg body "$NEW_BODY" '{body: $body}')"
