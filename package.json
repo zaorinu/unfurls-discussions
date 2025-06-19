@@ -1,11 +1,10 @@
 {
   "name": "unfurl-discussion-comment",
   "version": "1.0.0",
-  "description": "GitHub Action to unfurl links in Discussion comments",
-  "type": "module",
+  "description": "GitHub Action to unfurl links in discussion comments",
   "main": "dist/index.js",
   "scripts": {
-    "build": "npx @vercel/ncc build unfurl.mjs -o dist"
+    "build": "npx @vercel/ncc build unfurl.js -o dist"
   },
   "dependencies": {
     "@octokit/graphql": "^8.0.0",
