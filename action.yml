@@ -7,8 +7,8 @@ branding:
   color: 'yellow'
 
 runs:
-  using: 'node16'
-  main: 'unfurl.mjs'
+  using: 'node20'
+  main: 'dist/index.mjs'
 
 inputs:
   github_token:
