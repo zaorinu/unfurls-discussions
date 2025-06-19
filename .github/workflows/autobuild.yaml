@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'unfurl.js'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -26,7 +27,7 @@ jobs:
 
       - name: Build with ncc
         run: |
-          npx @vercel/ncc build unfurl.mjs -o dist
+          npx @vercel/ncc build unfurl.js -o dist
 
       - name: Commit and push dist
         run: |
