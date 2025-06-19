@@ -4,8 +4,6 @@
 
 ---
 
-## English
-
 ### Description
 This GitHub Action fetches and adds link previews below the original comment in a GitHub Discussion. It extracts titles from URLs and appends them as markdown blockquotes inside a special footer block.
 
