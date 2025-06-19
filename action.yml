@@ -1,0 +1,30 @@
+name: 'Unfurl Discussion Comment'
+description: 'Add link previews on GitHub Discussions'
+author: 'Luis Antonio'
+runs:
+  using: 'node16'
+  main: 'unfurl.mjs'
+
+inputs:
+  github_token:
+    description: 'GitHub token for API access'
+    required: true
+  comment_id_numeric:
+    description: 'Numeric ID of the comment'
+    required: true
+  comment_body:
+    description: 'Content of the comment'
+    required: true
+  repo_owner:
+    description: 'Repository owner'
+    required: true
+  repo_name:
+    description: 'Repository name'
+    required: true
+  discussion_number:
+    description: 'Discussion number'
+    required: true
+
+outputs:
+  updated_comment_id:
+    description: 'ID of the updated comment'

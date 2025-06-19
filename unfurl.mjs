@@ -14,7 +14,7 @@ import fetch from "node-fetch";
     headers: { authorization: `token ${token}` },
   });
 
-  // Busca os comentários da discussion
+  // Query to fetch comments from the discussion
   const query = `
     query($owner: String!, $repo: String!, $discussionNumber: Int!) {
       repository(owner: $owner, name: $repo) {
@@ -36,28 +36,30 @@ import fetch from "node-fetch";
   const commentNode = comments.find(c => c.databaseId === commentIdNumeric);
 
   if (!commentNode) {
-    console.error('Comentário não encontrado com ID numérico:', commentIdNumeric);
+    console.error('Comment not found with numeric ID:', commentIdNumeric);
     process.exit(1);
   }
 
   const commentNodeId = commentNode.id;
   let previews = '';
 
-  // Extrair URLs (somente do corpo fora do bloco de rodapé)
+  // Remove existing footer block if present, to avoid duplication
   const bodyWithoutFooter = originalBody.replace(/<!-- unfurl-bot-start -->[\s\S]*?<!-- unfurl-bot-end -->/g, '').trim();
+
+  // Extract URLs from the comment body (outside of footer block)
   const urls = [...bodyWithoutFooter.matchAll(/https?:\/\/[^\s)]+/g)].map(m => m[0]);
 
   for (const url of urls) {
     try {
-      const resp = await fetch(url);
-      const text = await resp.text();
+      const response = await fetch(url);
+      const text = await response.text();
       const dom = new JSDOM(text);
       const metaOgTitle = dom.window.document.querySelector('meta[property="og:title"]');
       const title = (metaOgTitle && metaOgTitle.getAttribute('content')) || dom.window.document.title || url;
 
       previews += `> **${title}**\n> ${url}\n\n`;
     } catch (err) {
-      console.error(`Erro ao buscar ${url}:`, err);
+      console.error(`Error fetching ${url}:`, err);
     }
   }
 
@@ -67,6 +69,7 @@ import fetch from "node-fetch";
     newBody += `\n\n<!-- unfurl-bot-start -->\n${previews}<!-- unfurl-bot-end -->`;
   }
 
+  // GraphQL mutation to update the discussion comment with previews
   const mutation = `
     mutation($commentId: ID!, $body: String!) {
       updateDiscussionComment(input: {commentId: $commentId, body: $body}) {
@@ -79,8 +82,8 @@ import fetch from "node-fetch";
   `;
 
   const updateRes = await graphqlWithAuth(mutation, { commentId: commentNodeId, body: newBody });
-  console.log('Comentário atualizado com sucesso:', updateRes.updateDiscussionComment.comment.id);
+  console.log('Comment successfully updated:', updateRes.updateDiscussionComment.comment.id);
 })().catch(err => {
-  console.error(err);
+  console.error('An unexpected error occurred:', err);
   process.exit(1);
 });

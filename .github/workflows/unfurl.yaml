@@ -1,0 +1,24 @@
+name: Unfurl Comments
+
+on:
+  discussion_comment:
+    types: [created, edited]
+
+permissions:
+  discussions: write
+
+jobs:
+  unfurl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run unfurl action
+        uses: ./  # local action for testings
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          comment_id_numeric: ${{ github.event.comment.id }}
+          comment_body: ${{ github.event.comment.body }}
+          repo_owner: ${{ github.repository_owner }}
+          repo_name: ${{ github.event.repository.name }}
+          discussion_number: ${{ github.event.discussion.number }}
