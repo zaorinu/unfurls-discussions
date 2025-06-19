@@ -1,6 +1,6 @@
 const { graphql } = require("@octokit/graphql");
 const { JSDOM } = require("jsdom");
-const fetch = require("node-fetch");
+const { fetch } = require('undici');
 
 (async () => {
   // Lendo os inputs passados pela Action
