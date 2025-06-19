@@ -4,6 +4,9 @@ on:
   discussion_comment:
     types: [created, edited]
 
+permissions:
+  discussions: write
+
 jobs:
   unfurl:
     runs-on: ubuntu-latest
