@@ -14,23 +14,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Checkout the repository to get the latest code
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Setup Node.js environment to run build tools
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
+      # Install dependencies from package.json
       - name: Install dependencies
         run: npm install
 
+      # Build the action code with ncc into dist folder
       - name: Build with ncc
         run: npx @vercel/ncc build unfurl.js -o dist
 
+      # Minify the built code using terser for smaller size
       - name: Minify dist/index.js with terser
         run: npx terser dist/index.js -o dist/index.js --compress --mangle
 
+      # Commit and push changes if dist/index.js or package-lock.json changed
+      - name: Commit and push dist and package-lock.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/index.js package-lock.json
+          git diff --quiet --staged || git commit -m "build: update dist and package-lock.json from unfurl.js"
+          git push origin main
+
+      # Create a new GitHub release with incremented version tag
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -44,6 +59,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Upload the minified dist/index.js as a release asset
       - name: Upload dist/index.js to release
         uses: actions/upload-release-asset@v1
         with:
