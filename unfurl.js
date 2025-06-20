@@ -3,7 +3,7 @@ const { JSDOM } = require("jsdom");
 const { fetch } = require('undici');
 
 (async () => {
-  // Lendo os inputs passados pela Action
+  // Reads input by action
   const token = process.env.INPUT_GITHUB_TOKEN;
   const commentIdNumeric = parseInt(process.env.INPUT_COMMENT_ID_NUMERIC, 10);
   const originalBody = process.env.INPUT_COMMENT_BODY;
@@ -15,7 +15,8 @@ const { fetch } = require('undici');
     headers: { authorization: `token ${token}` },
   });
 
-  const query = `
+  // Busca os comentários para achar o id (string) do comentário numérico (databaseId)
+  const queryComments = `
     query($owner: String!, $repo: String!, $discussionNumber: Int!) {
       repository(owner: $owner, name: $repo) {
         discussion(number: $discussionNumber) {
@@ -23,7 +24,6 @@ const { fetch } = require('undici');
             nodes {
               id
               databaseId
-              body
             }
           }
         }
@@ -32,8 +32,8 @@ const { fetch } = require('undici');
   `;
 
   try {
-    const res = await graphqlWithAuth(query, { owner, repo, discussionNumber });
-    const comments = res.repository.discussion.comments.nodes;
+    const resComments = await graphqlWithAuth(queryComments, { owner, repo, discussionNumber });
+    const comments = resComments.repository.discussion.comments.nodes;
     const commentNode = comments.find(c => c.databaseId === commentIdNumeric);
 
     if (!commentNode) {
@@ -42,6 +42,32 @@ const { fetch } = require('undici');
     }
 
     const commentNodeId = commentNode.id;
+
+    // Agora checa se é reply, consultando o comentário pelo ID para ver se replyTo existe
+    const queryCheckReply = `
+      query($owner: String!, $repo: String!, $discussionNumber: Int!, $commentId: ID!) {
+        repository(owner: $owner, name: $repo) {
+          discussion(number: $discussionNumber) {
+            comment(id: $commentId) {
+              id
+              replyTo {
+                id
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const resReply = await graphqlWithAuth(queryCheckReply, { owner, repo, discussionNumber, commentId: commentNodeId });
+    const isReply = resReply.repository.discussion.comment.replyTo !== null;
+
+    if (isReply) {
+      console.log('Replies are not supported by this action. Exiting without error.');
+      process.exit(0);
+    }
+
+    // Continua com o processo de unfurl normalmente
     let previews = '';
 
     const bodyWithoutFooter = originalBody.replace(/<!-- unfurl-bot-start -->[\s\S]*?<!-- unfurl-bot-end -->/g, '').trim();
@@ -79,6 +105,7 @@ const { fetch } = require('undici');
 
     const updateRes = await graphqlWithAuth(mutation, { commentId: commentNodeId, body: newBody });
     console.log('Comment successfully updated:', updateRes.updateDiscussionComment.comment.id);
+
   } catch (err) {
     console.error('An unexpected error occurred:', err);
     process.exit(1);
