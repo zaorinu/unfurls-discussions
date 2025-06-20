@@ -3,7 +3,7 @@ const { JSDOM } = require("jsdom");
 const { fetch } = require('undici');
 
 (async () => {
-  // Reads input by action
+  // Action inputs
   const token = process.env.INPUT_GITHUB_TOKEN;
   const commentIdNumeric = parseInt(process.env.INPUT_COMMENT_ID_NUMERIC, 10);
   const originalBody = process.env.INPUT_COMMENT_BODY;
@@ -15,7 +15,7 @@ const { fetch } = require('undici');
     headers: { authorization: `token ${token}` },
   });
 
-  // Busca os comentários para achar o id (string) do comentário numérico (databaseId)
+  // Query to fetch comments and find global ID by numeric databaseId
   const queryComments = `
     query($owner: String!, $repo: String!, $discussionNumber: Int!) {
       repository(owner: $owner, name: $repo) {
@@ -36,14 +36,15 @@ const { fetch } = require('undici');
     const comments = resComments.repository.discussion.comments.nodes;
     const commentNode = comments.find(c => c.databaseId === commentIdNumeric);
 
+    // If comment not found, exit gracefully (0) to avoid false alarms
     if (!commentNode) {
-      console.error('Comment not found with numeric ID:', commentIdNumeric);
-      process.exit(1);
+      console.log('Comment not found with numeric ID:', commentIdNumeric);
+      process.exit(0);
     }
 
     const commentNodeId = commentNode.id;
 
-    // Agora checa se é reply, consultando o comentário pelo ID para ver se replyTo existe
+    // Query to check if comment is a reply (replyTo exists)
     const queryCheckReply = `
       query($owner: String!, $repo: String!, $discussionNumber: Int!, $commentId: ID!) {
         repository(owner: $owner, name: $repo) {
@@ -60,16 +61,19 @@ const { fetch } = require('undici');
     `;
 
     const resReply = await graphqlWithAuth(queryCheckReply, { owner, repo, discussionNumber, commentId: commentNodeId });
-    const isReply = resReply.repository.discussion.comment.replyTo !== null;
+    const replyTo = resReply.repository.discussion.comment.replyTo;
+    const isReply = replyTo !== null && replyTo !== undefined;
 
+    // If this comment is a reply, exit with 0 (no error)
     if (isReply) {
       console.log('Replies are not supported by this action. Exiting without error.');
       process.exit(0);
     }
 
-    // Continua com o processo de unfurl normalmente
+    // Continue unfurl process for normal comments
     let previews = '';
 
+    // Remove previous unfurl footer to update
     const bodyWithoutFooter = originalBody.replace(/<!-- unfurl-bot-start -->[\s\S]*?<!-- unfurl-bot-end -->/g, '').trim();
     const urls = [...bodyWithoutFooter.matchAll(/https?:\/\/[^\s)]+/g)].map(m => m[0]);
 
@@ -92,6 +96,7 @@ const { fetch } = require('undici');
       newBody += `\n\n<!-- unfurl-bot-start -->\n${previews}<!-- unfurl-bot-end -->`;
     }
 
+    // Mutation to update the comment body with previews
     const mutation = `
       mutation($commentId: ID!, $body: String!) {
         updateDiscussionComment(input: {commentId: $commentId, body: $body}) {
