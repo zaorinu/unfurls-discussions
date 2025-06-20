@@ -36,7 +36,6 @@ const { fetch } = require('undici');
     const comments = resComments.repository.discussion.comments.nodes;
     const commentNode = comments.find(c => c.databaseId === commentIdNumeric);
 
-    // If comment not found, exit gracefully (0) to avoid false alarms
     if (!commentNode) {
       console.log('Comment not found with numeric ID:', commentIdNumeric);
       process.exit(0);
@@ -44,27 +43,24 @@ const { fetch } = require('undici');
 
     const commentNodeId = commentNode.id;
 
-    // Query to check if comment is a reply (replyTo exists)
+    // Correct query to check if comment is a reply using node(id:)
     const queryCheckReply = `
-      query($owner: String!, $repo: String!, $discussionNumber: Int!, $commentId: ID!) {
-        repository(owner: $owner, name: $repo) {
-          discussion(number: $discussionNumber) {
-            comment(id: $commentId) {
+      query($commentId: ID!) {
+        node(id: $commentId) {
+          ... on DiscussionComment {
+            id
+            replyTo {
               id
-              replyTo {
-                id
-              }
             }
           }
         }
       }
     `;
 
-    const resReply = await graphqlWithAuth(queryCheckReply, { owner, repo, discussionNumber, commentId: commentNodeId });
-    const replyTo = resReply.repository.discussion.comment.replyTo;
+    const resReply = await graphqlWithAuth(queryCheckReply, { commentId: commentNodeId });
+    const replyTo = resReply.node.replyTo;
     const isReply = replyTo !== null && replyTo !== undefined;
 
-    // If this comment is a reply, exit with 0 (no error)
     if (isReply) {
       console.log('Replies are not supported by this action. Exiting without error.');
       process.exit(0);
@@ -73,7 +69,6 @@ const { fetch } = require('undici');
     // Continue unfurl process for normal comments
     let previews = '';
 
-    // Remove previous unfurl footer to update
     const bodyWithoutFooter = originalBody.replace(/<!-- unfurl-bot-start -->[\s\S]*?<!-- unfurl-bot-end -->/g, '').trim();
     const urls = [...bodyWithoutFooter.matchAll(/https?:\/\/[^\s)]+/g)].map(m => m[0]);
 
@@ -96,7 +91,6 @@ const { fetch } = require('undici');
       newBody += `\n\n<!-- unfurl-bot-start -->\n${previews}<!-- unfurl-bot-end -->`;
     }
 
-    // Mutation to update the comment body with previews
     const mutation = `
       mutation($commentId: ID!, $body: String!) {
         updateDiscussionComment(input: {commentId: $commentId, body: $body}) {
